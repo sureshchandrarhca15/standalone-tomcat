@@ -126,23 +126,7 @@
         dest: "{{ TOMCAT2_HOME }}/webapps/clusterjsp.war"
       notify:
         - restart_tomcat-2
-
-    - name: Configure Tomcat-1 Connect to DB Server and it's Database 
-      template: 
-        src: templates/context.xml.j2
-        dest: "{{ TOMCAT1_HOME }}/conf/context.xml"
-        mode: 0644
-      notify:
-        - restart_tomcat-1
-
-    - name: Configure Tomcat-2 Connect to DB Server and it's Database 
-      template: 
-        src: templates/context.xml.j2 
-        dest: "{{ TOMCAT2_HOME }}/conf/context.xml"
-        mode: 0644
-      notify:
-        - restart_tomcat-2
-
+    
     - name: Verify Tomcat-1 Process is running or stopped
       shell: if ps -eaf | egrep "{{ TOMCAT1_HOME }}/conf/logging.properties"|grep -v grep > /dev/null ;then echo 'Tomcat1_process_running';else echo 'Tomcat1_process_not_running';fi
       register: tomcat1_process
