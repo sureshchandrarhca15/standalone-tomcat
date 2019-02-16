@@ -22,6 +22,7 @@
 <role rolename="admin-gui"/>
 <user username="admin" password="adm!n" roles="admin-gui"/>
 
+<user username="deployer" password="abc@123" roles="manager-script"/>
 <!--
   NOTE:  By default, no user is included in the "manager-gui" role required
   to operate the "/manager/html" web application.  If you wish to use this app,
