@@ -1,0 +1,176 @@
+- name: Install and Configure Apache tomcat
+  hosts: tomcat-servers
+  vars_files:
+    - vars/tomcat_vars.yml
+  tasks:
+    - name: Stop and Disable Firewalld
+      service:
+        name: firewalld
+        state: stopped
+        enabled: no
+
+    - name: Installing {{ JAVA }} 
+      yum: 
+        name: "{{ JAVA }}"
+        state: present
+
+    - name: Checking {{ TOMCAT }} Installer exists 
+      stat:
+        path: ~/apache-tomcat-8.5.31.tar.gz
+      register: st_tomcat
+
+    - name: Tomcat Installer does not exists....Copy {{ TOMCAT }} into /root Directory 
+      copy:
+        src: files/apache-tomcat-8.5.31.tar.gz 
+        dest: ~/
+      when: not st_tomcat.stat.exists
+
+    - name: Configure Tomcat-1 in /opt/Tomcat-1
+      shell: /usr/bin/tar -xzvf ~/apache-tomcat-8.5.31.tar.gz -C "{{ TOMCAT_INSTALL_DIR }}" && sleep 2 && mv "{{ TOMCAT_INSTALL_DIR }}"/apache-tomcat-8.5.31 "{{ TOMCAT1_HOME }}"
+      args:
+        chdir: "{{ TOMCAT_INSTALL_DIR }}"
+        creates: "{{ TOMCAT1_HOME }}"
+
+    - name: Configure Tomcat-2 in /opt/Tomcat-2
+      shell: /usr/bin/tar -xzvf ~/apache-tomcat-8.5.31.tar.gz -C "{{ TOMCAT_INSTALL_DIR }}" && sleep 2 &&  mv "{{ TOMCAT_INSTALL_DIR }}"/apache-tomcat-8.5.31 "{{ TOMCAT2_HOME }}"
+      args:
+        chdir: "{{ TOMCAT_INSTALL_DIR }}"
+        creates: "{{ TOMCAT2_HOME }}"
+
+    - name: Install MySQL Connector for Tomcat-1
+      copy:
+        src: files/mysql-connector-java-5.1.40.jar
+        dest: "{{ TOMCAT1_HOME }}/lib/mysql-connector-java-5.1.40.jar"
+
+    - name: Install MySQL Connector for Tomcat-2
+      copy:
+        src: files/mysql-connector-java-5.1.40.jar
+        dest: "{{ TOMCAT2_HOME }}/lib/mysql-connector-java-5.1.40.jar"
+
+    - name: Configure server.xml for Tomcat-1
+      copy:
+        src: files/Tomcat-1/server.xml
+        dest: "{{ TOMCAT1_HOME }}/conf/server.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-1 
+
+    - name: Configure server.xml for Tomcat-2
+      copy:
+        src: files/Tomcat-2/server.xml
+        dest: "{{ TOMCAT2_HOME }}/conf/server.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-2
+
+    - name:  Setup Tomcat User Accounts for Tomcat-1 
+      copy: 
+        src: files/Tomcat-1/tomcat-users.xml
+        dest: "{{ TOMCAT1_HOME }}/conf/tomcat-users.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-1
+
+    - name:  Setup Tomcat User Accounts for Tomcat-2 
+      copy: 
+        src: files/Tomcat-2/tomcat-users.xml
+        dest: "{{ TOMCAT2_HOME }}/conf/tomcat-users.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-2
+
+    - name: Allowing Manager Status Page from Network for Tomcat-1
+      copy:
+        src: files/Tomcat-1/manager-context.xml
+        dest: "{{ TOMCAT1_HOME }}/webapps/manager/META-INF/context.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-1
+
+    - name: Allowing Manager Status Page from Network for Tomcat-2
+      copy:
+        src: files/Tomcat-2/manager-context.xml
+        dest: "{{ TOMCAT2_HOME }}/webapps/manager/META-INF/context.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-2
+
+    - name: Allowing Host Manager  Page from Network for Tomcat-1
+      copy: 
+        src: files/Tomcat-1/host-manager-context.xml 
+        dest: "{{ TOMCAT1_HOME }}/webapps/host-manager/META-INF/context.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-1
+
+
+    - name: Allowing Host Manager  Page from Network for Tomcat-2
+      copy: 
+        src: files/Tomcat-2/host-manager-context.xml 
+        dest: "{{ TOMCAT2_HOME }}/webapps/host-manager/META-INF/context.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-2
+
+    - name: Deploy clusterjsp.war app to Tomcat-1
+      copy:
+        src: files/clusterjsp.war
+        dest: "{{ TOMCAT1_HOME }}/webapps/clusterjsp.war"
+      notify:
+        - restart_tomcat-1
+
+
+    - name: Deploy clusterjsp.war app to Tomcat-2
+      copy:
+        src: files/clusterjsp.war
+        dest: "{{ TOMCAT2_HOME }}/webapps/clusterjsp.war"
+      notify:
+        - restart_tomcat-2
+
+    - name: Configure Tomcat-1 Connect to DB Server and it's Database 
+      template: 
+        src: templates/context.xml.j2
+        dest: "{{ TOMCAT1_HOME }}/conf/context.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-1
+
+    - name: Configure Tomcat-2 Connect to DB Server and it's Database 
+      template: 
+        src: templates/context.xml.j2 
+        dest: "{{ TOMCAT2_HOME }}/conf/context.xml"
+        mode: 0644
+      notify:
+        - restart_tomcat-2
+
+    - name: Verify Tomcat-1 Process is running or stopped
+      shell: if ps -eaf | egrep "{{ TOMCAT1_HOME }}/conf/logging.properties"|grep -v grep > /dev/null ;then echo 'Tomcat1_process_running';else echo 'Tomcat1_process_not_running';fi
+      register: tomcat1_process
+
+    - debug:
+        var: tomcat1_process.stdout
+
+    - name: Start Tomcat-1 instance
+      shell: "nohup {{ TOMCAT1_HOME }}/bin/startup.sh"
+      when: tomcat1_process.stdout == "Tomcat1_process_not_running"
+
+    - name: Verify Tomcat-2 Process is running or stopped
+      shell: if ps -eaf | egrep "{{ TOMCAT2_HOME }}/conf/logging.properties"|grep -v grep > /dev/null ;then echo 'Tomcat2_process_running';else echo 'Tomcat2_process_not_running';fi
+      register: tomcat2_process
+
+    - debug:
+        var: tomcat2_process.stdout
+
+    - name: Start Tomcat-2 instance
+      shell: "nohup {{ TOMCAT2_HOME }}/bin/startup.sh"
+      when: tomcat2_process.stdout == "Tomcat2_process_not_running"
+
+  handlers:
+    - name: restart_tomcat-1
+      shell: TOMCAT1PID=$(ps -ef | grep Tomcat-1 | grep -v grep | awk '{print $2}') &&  kill -9 $TOMCAT1PID && sleep 2 && nohup "{{ TOMCAT1_HOME }}/bin/startup.sh"
+
+    - name: restart_tomcat-2
+      shell: TOMCAT2PID=$(ps -ef | grep Tomcat-2 | grep -v grep | awk '{print $2}') &&  kill -9 $TOMCAT2PID && sleep 2 && nohup "{{ TOMCAT2_HOME }}/bin/startup.sh"
+
+
+

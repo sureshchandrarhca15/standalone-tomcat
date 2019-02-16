@@ -1,0 +1,7 @@
+---
+JAVA: java-1.8.0-openjdk.x86_64
+TOMCAT: apache-tomcat-8.5.31.tar.gz
+TOMCAT_INSTALL_DIR: /opt/
+TOMCAT1_HOME: /opt/Tomcat-1
+TOMCAT2_HOME: /opt/Tomcat-2
+
